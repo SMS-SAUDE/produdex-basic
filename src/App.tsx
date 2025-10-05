@@ -7,6 +7,12 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { Layout } from "@/components/Layout";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
+import Products from "./pages/Products";
+import Entries from "./pages/Entries";
+import Exits from "./pages/Exits";
+import Invoices from "./pages/Invoices";
+import Shopping from "./pages/Shopping";
+import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -25,6 +31,66 @@ const App = () => (
               <ProtectedRoute>
                 <Layout>
                   <Dashboard />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/products"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <Products />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/entries"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <Entries />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/exits"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <Exits />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/invoices"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <Invoices />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/shopping"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <Shopping />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/settings"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <Settings />
                 </Layout>
               </ProtectedRoute>
             }
