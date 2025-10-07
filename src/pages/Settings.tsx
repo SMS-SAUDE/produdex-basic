@@ -37,6 +37,7 @@ export default function Settings() {
   const { user, isAdmin } = useAuth();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingLocation, setEditingLocation] = useState<any>(null);
+  const [userDialogOpen, setUserDialogOpen] = useState(false);
   const queryClient = useQueryClient();
 
   const [formData, setFormData] = useState({
@@ -46,6 +47,13 @@ export default function Settings() {
 
   const [profileData, setProfileData] = useState({
     full_name: "",
+  });
+
+  const [newUserData, setNewUserData] = useState({
+    email: "",
+    password: "",
+    full_name: "",
+    role: "user" as "admin" | "user",
   });
 
   const { data: locations, isLoading } = useQuery({
@@ -237,6 +245,60 @@ export default function Settings() {
     },
   });
 
+  const createUserMutation = useMutation({
+    mutationFn: async (userData: typeof newUserData) => {
+      // Criar usuário via Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: userData.email,
+        password: userData.password,
+        options: {
+          data: {
+            full_name: userData.full_name,
+          },
+        },
+      });
+
+      if (authError) throw authError;
+      if (!authData.user) throw new Error("Erro ao criar usuário");
+
+      // Adicionar role ao usuário
+      const { error: roleError } = await supabase
+        .from("user_roles")
+        .insert([{ user_id: authData.user.id, role: userData.role }]);
+
+      if (roleError) throw roleError;
+
+      return authData.user;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+      toast({ title: "Usuário criado com sucesso!" });
+      setUserDialogOpen(false);
+      resetUserForm();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro ao criar usuário",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const resetUserForm = () => {
+    setNewUserData({
+      email: "",
+      password: "",
+      full_name: "",
+      role: "user",
+    });
+  };
+
+  const handleCreateUser = (e: React.FormEvent) => {
+    e.preventDefault();
+    createUserMutation.mutate(newUserData);
+  };
+
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold">Configurações</h1>
@@ -279,10 +341,96 @@ export default function Settings() {
           <TabsContent value="users">
             <Card>
               <CardHeader>
-                <CardTitle>Gerenciamento de Usuários</CardTitle>
-                <CardDescription>
-                  Gerencie os usuários e suas permissões no sistema
-                </CardDescription>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <CardTitle>Gerenciamento de Usuários</CardTitle>
+                    <CardDescription>
+                      Gerencie os usuários e suas permissões no sistema
+                    </CardDescription>
+                  </div>
+                  <Dialog open={userDialogOpen} onOpenChange={setUserDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button onClick={resetUserForm}>
+                        <Plus className="mr-2 h-4 w-4" />
+                        Adicionar Usuário
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-xl">
+                      <DialogHeader>
+                        <DialogTitle>Novo Usuário</DialogTitle>
+                      </DialogHeader>
+                      <form onSubmit={handleCreateUser} className="space-y-4">
+                        <div>
+                          <Label>Email *</Label>
+                          <Input
+                            type="email"
+                            required
+                            value={newUserData.email}
+                            onChange={(e) =>
+                              setNewUserData({ ...newUserData, email: e.target.value })
+                            }
+                          />
+                        </div>
+                        <div>
+                          <Label>Senha *</Label>
+                          <Input
+                            type="password"
+                            required
+                            minLength={6}
+                            value={newUserData.password}
+                            onChange={(e) =>
+                              setNewUserData({ ...newUserData, password: e.target.value })
+                            }
+                          />
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Mínimo 6 caracteres
+                          </p>
+                        </div>
+                        <div>
+                          <Label>Nome Completo</Label>
+                          <Input
+                            value={newUserData.full_name}
+                            onChange={(e) =>
+                              setNewUserData({ ...newUserData, full_name: e.target.value })
+                            }
+                          />
+                        </div>
+                        <div>
+                          <Label>Perfil *</Label>
+                          <Select
+                            value={newUserData.role}
+                            onValueChange={(value: "admin" | "user") =>
+                              setNewUserData({ ...newUserData, role: value })
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="user">User</SelectItem>
+                              <SelectItem value="admin">Admin</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="flex gap-2 justify-end">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => {
+                              setUserDialogOpen(false);
+                              resetUserForm();
+                            }}
+                          >
+                            Cancelar
+                          </Button>
+                          <Button type="submit" disabled={createUserMutation.isPending}>
+                            {createUserMutation.isPending ? "Criando..." : "Criar Usuário"}
+                          </Button>
+                        </div>
+                      </form>
+                    </DialogContent>
+                  </Dialog>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="border rounded-lg">
