@@ -6,7 +6,8 @@ import {
   FileText,
   ShoppingCart,
   Settings,
-  LogOut
+  LogOut,
+  BarChart3
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import {
@@ -31,6 +32,7 @@ const menuItems = [
   { title: "Saídas", url: "/exits", icon: ArrowUpFromLine },
   { title: "Notas Fiscais", url: "/invoices", icon: FileText },
   { title: "Lista de Compras", url: "/shopping", icon: ShoppingCart },
+  { title: "Relatórios", url: "/reports", icon: BarChart3 },
   { title: "Configurações", url: "/settings", icon: Settings },
 ];
 

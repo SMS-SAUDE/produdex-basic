@@ -25,6 +25,13 @@ import { toast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export default function Settings() {
   const { user, isAdmin } = useAuth();
@@ -67,6 +74,33 @@ export default function Settings() {
       return data;
     },
     enabled: !!user?.id,
+  });
+
+  // Buscar todos os usuários (apenas para admin)
+  const { data: users } = useQuery({
+    queryKey: ["users"],
+    queryFn: async () => {
+      const { data: profilesData, error: profilesError } = await supabase
+        .from("profiles")
+        .select("*")
+        .order("email");
+      
+      if (profilesError) throw profilesError;
+
+      // Buscar roles de cada usuário
+      const { data: rolesData, error: rolesError } = await supabase
+        .from("user_roles")
+        .select("*");
+      
+      if (rolesError) throw rolesError;
+
+      // Combinar dados
+      return profilesData.map((profile) => ({
+        ...profile,
+        roles: rolesData.filter((role) => role.user_id === profile.id),
+      }));
+    },
+    enabled: isAdmin,
   });
 
   const createLocationMutation = useMutation({
@@ -170,6 +204,39 @@ export default function Settings() {
     updateProfileMutation.mutate(profileData);
   };
 
+  const addUserRoleMutation = useMutation({
+    mutationFn: async ({ userId, role }: { userId: string; role: "admin" | "user" }) => {
+      const { error } = await supabase
+        .from("user_roles")
+        .insert([{ user_id: userId, role }]);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+      toast({ title: "Role adicionado com sucesso!" });
+    },
+    onError: () => {
+      toast({ title: "Erro ao adicionar role", variant: "destructive" });
+    },
+  });
+
+  const removeUserRoleMutation = useMutation({
+    mutationFn: async (roleId: string) => {
+      const { error } = await supabase
+        .from("user_roles")
+        .delete()
+        .eq("id", roleId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+      toast({ title: "Role removido com sucesso!" });
+    },
+    onError: () => {
+      toast({ title: "Erro ao remover role", variant: "destructive" });
+    },
+  });
+
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold">Configurações</h1>
@@ -177,6 +244,7 @@ export default function Settings() {
       <Tabs defaultValue="profile" className="w-full">
         <TabsList>
           <TabsTrigger value="profile">Perfil</TabsTrigger>
+          {isAdmin && <TabsTrigger value="users">Usuários</TabsTrigger>}
           {isAdmin && <TabsTrigger value="locations">Locais de Armazenamento</TabsTrigger>}
         </TabsList>
 
@@ -206,6 +274,83 @@ export default function Settings() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {isAdmin && (
+          <TabsContent value="users">
+            <Card>
+              <CardHeader>
+                <CardTitle>Gerenciamento de Usuários</CardTitle>
+                <CardDescription>
+                  Gerencie os usuários e suas permissões no sistema
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="border rounded-lg">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Nome</TableHead>
+                        <TableHead>Roles</TableHead>
+                        <TableHead className="text-right">Ações</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {users?.map((userItem) => (
+                        <TableRow key={userItem.id}>
+                          <TableCell className="font-medium">{userItem.email}</TableCell>
+                          <TableCell>{userItem.full_name || "-"}</TableCell>
+                          <TableCell>
+                            <div className="flex gap-1 flex-wrap">
+                              {userItem.roles.map((role: any) => (
+                                <span
+                                  key={role.id}
+                                  className="px-2 py-1 rounded text-xs bg-primary/10 text-primary flex items-center gap-1"
+                                >
+                                  {role.role}
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-3 w-3 p-0 hover:bg-destructive/20"
+                                    onClick={() => {
+                                      if (confirm("Deseja remover este role?")) {
+                                        removeUserRoleMutation.mutate(role.id);
+                                      }
+                                    }}
+                                  >
+                                    <Trash2 className="h-2 w-2" />
+                                  </Button>
+                                </span>
+                              ))}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Select
+                              onValueChange={(value: "admin" | "user") =>
+                                addUserRoleMutation.mutate({
+                                  userId: userItem.id,
+                                  role: value,
+                                })
+                              }
+                            >
+                              <SelectTrigger className="w-[140px]">
+                                <SelectValue placeholder="Adicionar role" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="admin">Admin</SelectItem>
+                                <SelectItem value="user">User</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
 
         {isAdmin && (
           <TabsContent value="locations">
