@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus } from "lucide-react";
+import { Plus, Pencil, Trash2 } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -20,6 +20,16 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -32,6 +42,9 @@ import { Textarea } from "@/components/ui/textarea";
 
 export default function Exits() {
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingExit, setEditingExit] = useState<any>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [exitToDelete, setExitToDelete] = useState<any>(null);
   const [dateFilter, setDateFilter] = useState("");
   const queryClient = useQueryClient();
 
@@ -102,6 +115,44 @@ export default function Exits() {
     },
   });
 
+  const updateMutation = useMutation({
+    mutationFn: async (values: any) => {
+      const { error } = await supabase
+        .from("product_exits")
+        .update(values)
+        .eq("id", editingExit.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["exits"] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      toast({ title: "Saída atualizada com sucesso!" });
+      setDialogOpen(false);
+      setEditingExit(null);
+      resetForm();
+    },
+    onError: () => {
+      toast({ title: "Erro ao atualizar saída", variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("product_exits").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["exits"] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      toast({ title: "Saída excluída com sucesso!" });
+      setDeleteDialogOpen(false);
+      setExitToDelete(null);
+    },
+    onError: () => {
+      toast({ title: "Erro ao excluir saída", variant: "destructive" });
+    },
+  });
+
   const resetForm = () => {
     setFormData({
       dia: new Date().toISOString().split("T")[0],
@@ -114,20 +165,55 @@ export default function Exits() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    createMutation.mutate({
+    const values = {
       dia: formData.dia,
       produto_id: formData.produto_id,
       local_id: formData.local_id || null,
       quantidade: parseFloat(formData.quantidade),
       motivo: formData.motivo || null,
+    };
+
+    if (editingExit) {
+      updateMutation.mutate(values);
+    } else {
+      createMutation.mutate(values);
+    }
+  };
+
+  const handleEdit = (exit: any) => {
+    setEditingExit(exit);
+    setFormData({
+      dia: exit.dia,
+      produto_id: exit.produto_id,
+      local_id: exit.local_id || "",
+      quantidade: exit.quantidade.toString(),
+      motivo: exit.motivo || "",
     });
+    setDialogOpen(true);
+  };
+
+  const handleDelete = (exit: any) => {
+    setExitToDelete(exit);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (exitToDelete) {
+      deleteMutation.mutate(exitToDelete.id);
+    }
   };
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Saídas de Produtos</h1>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <Dialog open={dialogOpen} onOpenChange={(open) => {
+          setDialogOpen(open);
+          if (!open) {
+            setEditingExit(null);
+            resetForm();
+          }
+        }}>
           <DialogTrigger asChild>
             <Button onClick={resetForm}>
               <Plus className="mr-2 h-4 w-4" />
@@ -136,7 +222,7 @@ export default function Exits() {
           </DialogTrigger>
           <DialogContent className="max-w-xl">
             <DialogHeader>
-              <DialogTitle>Nova Saída</DialogTitle>
+              <DialogTitle>{editingExit ? "Editar Saída" : "Nova Saída"}</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
@@ -216,17 +302,18 @@ export default function Exits() {
                 </div>
               </div>
               <div className="flex gap-2 justify-end">
-                <Button
+                  <Button
                   type="button"
                   variant="outline"
                   onClick={() => {
                     setDialogOpen(false);
+                    setEditingExit(null);
                     resetForm();
                   }}
                 >
                   Cancelar
                 </Button>
-                <Button type="submit">Registrar</Button>
+                <Button type="submit">{editingExit ? "Atualizar" : "Registrar"}</Button>
               </div>
             </form>
           </DialogContent>
@@ -255,18 +342,19 @@ export default function Exits() {
               <TableHead>Quantidade</TableHead>
               <TableHead>Local</TableHead>
               <TableHead>Motivo</TableHead>
+              <TableHead className="text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center">
+                <TableCell colSpan={7} className="text-center">
                   Carregando...
                 </TableCell>
               </TableRow>
             ) : exits?.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center">
+                <TableCell colSpan={7} className="text-center">
                   Nenhuma saída encontrada
                 </TableCell>
               </TableRow>
@@ -285,12 +373,47 @@ export default function Exits() {
                   <TableCell className="max-w-xs truncate">
                     {exit.motivo || "-"}
                   </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleEdit(exit)}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDelete(exit)}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  </TableCell>
                 </TableRow>
               ))
             )}
           </TableBody>
         </Table>
       </div>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir esta saída? O estoque do produto será ajustado automaticamente. Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
