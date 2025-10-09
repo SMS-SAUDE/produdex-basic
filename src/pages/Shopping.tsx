@@ -3,7 +3,20 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Search, X } from "lucide-react";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Table,
   TableBody,
@@ -34,6 +47,8 @@ import { Badge } from "@/components/ui/badge";
 export default function Shopping() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState("all");
+  const [comboOpen, setComboOpen] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const queryClient = useQueryClient();
 
   const [formData, setFormData] = useState({
@@ -41,6 +56,18 @@ export default function Shopping() {
     quantidade: "",
     unidade: "unidade",
     prioridade: "media",
+  });
+
+  const { data: products } = useQuery({
+    queryKey: ["products"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("products")
+        .select("*")
+        .order("produto");
+      if (error) throw error;
+      return data;
+    },
   });
 
   const { data: items, isLoading } = useQuery({
@@ -117,6 +144,26 @@ export default function Shopping() {
       unidade: "unidade",
       prioridade: "media",
     });
+    setSelectedProduct(null);
+  };
+
+  const handleProductSelect = (product: any) => {
+    setSelectedProduct(product);
+    setFormData({
+      ...formData,
+      produto: `${product.produto} - ${product.marca}`,
+      unidade: product.unidade,
+    });
+    setComboOpen(false);
+  };
+
+  const handleClearSelection = () => {
+    setSelectedProduct(null);
+    setFormData({
+      ...formData,
+      produto: "",
+      unidade: "unidade",
+    });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -163,13 +210,77 @@ export default function Shopping() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
                   <Label>Produto *</Label>
-                  <Input
-                    required
-                    value={formData.produto}
-                    onChange={(e) =>
-                      setFormData({ ...formData, produto: e.target.value })
-                    }
-                  />
+                  <div className="flex gap-2">
+                    <Popover open={comboOpen} onOpenChange={setComboOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          type="button"
+                          className="shrink-0"
+                        >
+                          <Search className="h-4 w-4" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[400px] p-0" align="start">
+                        <Command>
+                          <CommandInput placeholder="Buscar produto cadastrado..." />
+                          <CommandList>
+                            <CommandEmpty>Nenhum produto encontrado.</CommandEmpty>
+                            <CommandGroup>
+                              {products?.map((product) => (
+                                <CommandItem
+                                  key={product.id}
+                                  value={`${product.produto} ${product.marca}`}
+                                  onSelect={() => handleProductSelect(product)}
+                                >
+                                  <div className="flex flex-col">
+                                    <span className="font-medium">
+                                      {product.produto} - {product.marca}
+                                    </span>
+                                    <span className="text-xs text-muted-foreground">
+                                      Unidade: {product.unidade}
+                                    </span>
+                                  </div>
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                    <div className="flex-1 relative">
+                      <Input
+                        required
+                        value={formData.produto}
+                        onChange={(e) =>
+                          setFormData({ ...formData, produto: e.target.value })
+                        }
+                        placeholder={
+                          selectedProduct
+                            ? "Produto selecionado"
+                            : "Digite ou selecione um produto"
+                        }
+                        className={selectedProduct ? "pr-8" : ""}
+                      />
+                      {selectedProduct && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="absolute right-0 top-0 h-full"
+                          onClick={handleClearSelection}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                  {selectedProduct && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Produto cadastrado selecionado. Clique no X para digitar manualmente.
+                    </p>
+                  )}
                 </div>
                 <div>
                   <Label>Quantidade *</Label>
