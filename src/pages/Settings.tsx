@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Download, Upload } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -55,6 +55,10 @@ export default function Settings() {
     full_name: "",
     role: "user" as "admin" | "user",
   });
+
+  const [isExporting, setIsExporting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: locations, isLoading } = useQuery({
     queryKey: ["locations"],
@@ -299,6 +303,128 @@ export default function Settings() {
     createUserMutation.mutate(newUserData);
   };
 
+  const handleExportData = async () => {
+    setIsExporting(true);
+    try {
+      // Buscar todos os dados das tabelas principais
+      const [
+        { data: products },
+        { data: locations },
+        { data: invoices },
+        { data: entries },
+        { data: exits },
+        { data: shopping }
+      ] = await Promise.all([
+        supabase.from("products").select("*"),
+        supabase.from("storage_locations").select("*"),
+        supabase.from("invoices").select("*"),
+        supabase.from("product_entries").select("*"),
+        supabase.from("product_exits").select("*"),
+        supabase.from("shopping_list").select("*")
+      ]);
+
+      const backupData = {
+        version: "1.0",
+        export_date: new Date().toISOString(),
+        data: {
+          products: products || [],
+          storage_locations: locations || [],
+          invoices: invoices || [],
+          product_entries: entries || [],
+          product_exits: exits || [],
+          shopping_list: shopping || []
+        }
+      };
+
+      // Criar arquivo para download
+      const dataStr = JSON.stringify(backupData, null, 2);
+      const dataBlob = new Blob([dataStr], { type: "application/json" });
+      const url = URL.createObjectURL(dataBlob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `backup-${new Date().toISOString().split("T")[0]}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      toast({ title: "Backup exportado com sucesso!" });
+    } catch (error) {
+      console.error("Erro ao exportar:", error);
+      toast({
+        title: "Erro ao exportar dados",
+        variant: "destructive"
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleImportData = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsImporting(true);
+    try {
+      const text = await file.text();
+      const backupData = JSON.parse(text);
+
+      if (!backupData.data) {
+        throw new Error("Formato de backup inválido");
+      }
+
+      // Importar dados (substituir ou inserir novos)
+      const { data } = backupData;
+      
+      // Importar locais de armazenamento primeiro (podem ser referenciados)
+      if (data.storage_locations?.length > 0) {
+        await supabase.from("storage_locations").upsert(data.storage_locations);
+      }
+
+      // Importar notas fiscais
+      if (data.invoices?.length > 0) {
+        await supabase.from("invoices").upsert(data.invoices);
+      }
+
+      // Importar produtos
+      if (data.products?.length > 0) {
+        await supabase.from("products").upsert(data.products);
+      }
+
+      // Importar entradas
+      if (data.product_entries?.length > 0) {
+        await supabase.from("product_entries").upsert(data.product_entries);
+      }
+
+      // Importar saídas
+      if (data.product_exits?.length > 0) {
+        await supabase.from("product_exits").upsert(data.product_exits);
+      }
+
+      // Importar lista de compras
+      if (data.shopping_list?.length > 0) {
+        await supabase.from("shopping_list").upsert(data.shopping_list);
+      }
+
+      // Recarregar dados
+      queryClient.invalidateQueries();
+
+      toast({ title: "Dados importados com sucesso!" });
+    } catch (error) {
+      console.error("Erro ao importar:", error);
+      toast({
+        title: "Erro ao importar dados",
+        description: error instanceof Error ? error.message : "Formato inválido",
+        variant: "destructive"
+      });
+    } finally {
+      setIsImporting(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
+
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold">Configurações</h1>
@@ -308,6 +434,7 @@ export default function Settings() {
           <TabsTrigger value="profile">Perfil</TabsTrigger>
           {isAdmin && <TabsTrigger value="users">Usuários</TabsTrigger>}
           {isAdmin && <TabsTrigger value="locations">Locais de Armazenamento</TabsTrigger>}
+          {isAdmin && <TabsTrigger value="backup">Backup</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="profile">
@@ -622,6 +749,73 @@ export default function Settings() {
                       )}
                     </TableBody>
                   </Table>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
+
+        {isAdmin && (
+          <TabsContent value="backup">
+            <Card>
+              <CardHeader>
+                <CardTitle>Backup e Restauração</CardTitle>
+                <CardDescription>
+                  Exporte ou importe todos os dados do sistema
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="text-lg font-semibold mb-2">Exportar Dados</h3>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Baixe um arquivo JSON contendo todos os dados do sistema (produtos, entradas, saídas, notas fiscais, locais e lista de compras).
+                    </p>
+                    <Button
+                      onClick={handleExportData}
+                      disabled={isExporting}
+                      className="w-full sm:w-auto"
+                    >
+                      <Download className="mr-2 h-4 w-4" />
+                      {isExporting ? "Exportando..." : "Exportar Backup"}
+                    </Button>
+                  </div>
+
+                  <div className="border-t pt-4">
+                    <h3 className="text-lg font-semibold mb-2">Importar Dados</h3>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Carregue um arquivo de backup para restaurar ou importar dados. 
+                      <span className="font-semibold text-destructive"> Atenção: </span>
+                      Os dados existentes com os mesmos IDs serão substituídos.
+                    </p>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".json"
+                      onChange={handleImportData}
+                      className="hidden"
+                      id="file-upload"
+                    />
+                    <Button
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isImporting}
+                      variant="outline"
+                      className="w-full sm:w-auto"
+                    >
+                      <Upload className="mr-2 h-4 w-4" />
+                      {isImporting ? "Importando..." : "Importar Backup"}
+                    </Button>
+                  </div>
+
+                  <div className="border-t pt-4">
+                    <h3 className="text-lg font-semibold mb-2">Informações</h3>
+                    <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                      <li>O backup inclui: produtos, entradas, saídas, notas fiscais, locais de armazenamento e lista de compras</li>
+                      <li>Dados de usuários e permissões não são incluídos por segurança</li>
+                      <li>Ao importar, os dados com IDs existentes serão atualizados</li>
+                      <li>Guarde os backups em local seguro</li>
+                    </ul>
+                  </div>
                 </div>
               </CardContent>
             </Card>
