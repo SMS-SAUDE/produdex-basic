@@ -403,45 +403,72 @@ export default function Settings() {
     setIsImporting(true);
     try {
       const { data } = backupPreview;
+      const errors: string[] = [];
       
       // Importar apenas os dados selecionados na ordem correta
       if (selectedTables.storage_locations && data.storage_locations?.length > 0) {
-        await supabase.from("storage_locations").upsert(data.storage_locations);
+        const { error } = await supabase
+          .from("storage_locations")
+          .upsert(data.storage_locations, { onConflict: 'id' });
+        if (error) errors.push(`Locais: ${error.message}`);
       }
 
       if (selectedTables.invoices && data.invoices?.length > 0) {
-        await supabase.from("invoices").upsert(data.invoices);
+        const { error } = await supabase
+          .from("invoices")
+          .upsert(data.invoices, { onConflict: 'id' });
+        if (error) errors.push(`Notas Fiscais: ${error.message}`);
       }
 
       if (selectedTables.products && data.products?.length > 0) {
-        await supabase.from("products").upsert(data.products);
+        const { error } = await supabase
+          .from("products")
+          .upsert(data.products, { onConflict: 'id' });
+        if (error) errors.push(`Produtos: ${error.message}`);
       }
 
       if (selectedTables.product_entries && data.product_entries?.length > 0) {
-        await supabase.from("product_entries").upsert(data.product_entries);
+        const { error } = await supabase
+          .from("product_entries")
+          .upsert(data.product_entries, { onConflict: 'id' });
+        if (error) errors.push(`Entradas: ${error.message}`);
       }
 
       if (selectedTables.product_exits && data.product_exits?.length > 0) {
-        await supabase.from("product_exits").upsert(data.product_exits);
+        const { error } = await supabase
+          .from("product_exits")
+          .upsert(data.product_exits, { onConflict: 'id' });
+        if (error) errors.push(`Saídas: ${error.message}`);
       }
 
       if (selectedTables.shopping_list && data.shopping_list?.length > 0) {
-        await supabase.from("shopping_list").upsert(data.shopping_list);
+        const { error } = await supabase
+          .from("shopping_list")
+          .upsert(data.shopping_list, { onConflict: 'id' });
+        if (error) errors.push(`Lista de Compras: ${error.message}`);
       }
 
       // Recarregar dados
       queryClient.invalidateQueries();
 
-      toast({ title: "Dados importados com sucesso!" });
-      setBackupPreview(null);
-      setSelectedTables({
-        products: true,
-        storage_locations: true,
-        invoices: true,
-        product_entries: true,
-        product_exits: true,
-        shopping_list: true
-      });
+      if (errors.length > 0) {
+        toast({
+          title: "Importação concluída com erros",
+          description: errors.join(", "),
+          variant: "destructive"
+        });
+      } else {
+        toast({ title: "Dados importados com sucesso!" });
+        setBackupPreview(null);
+        setSelectedTables({
+          products: true,
+          storage_locations: true,
+          invoices: true,
+          product_entries: true,
+          product_exits: true,
+          shopping_list: true
+        });
+      }
     } catch (error) {
       console.error("Erro ao importar:", error);
       toast({
