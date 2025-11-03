@@ -59,6 +59,15 @@ export default function Settings() {
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [backupPreview, setBackupPreview] = useState<any>(null);
+  const [selectedTables, setSelectedTables] = useState({
+    products: true,
+    storage_locations: true,
+    invoices: true,
+    product_entries: true,
+    product_exits: true,
+    shopping_list: true
+  });
 
   const { data: locations, isLoading } = useQuery({
     queryKey: ["locations"],
@@ -360,11 +369,10 @@ export default function Settings() {
     }
   };
 
-  const handleImportData = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLoadBackupFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    setIsImporting(true);
     try {
       const text = await file.text();
       const backupData = JSON.parse(text);
@@ -373,36 +381,51 @@ export default function Settings() {
         throw new Error("Formato de backup inválido");
       }
 
-      // Importar dados (substituir ou inserir novos)
-      const { data } = backupData;
+      setBackupPreview(backupData);
+      toast({ title: "Backup carregado! Selecione os dados para importar." });
+    } catch (error) {
+      console.error("Erro ao carregar backup:", error);
+      toast({
+        title: "Erro ao carregar backup",
+        description: error instanceof Error ? error.message : "Formato inválido",
+        variant: "destructive"
+      });
+    } finally {
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
+
+  const handleImportSelectedData = async () => {
+    if (!backupPreview) return;
+
+    setIsImporting(true);
+    try {
+      const { data } = backupPreview;
       
-      // Importar locais de armazenamento primeiro (podem ser referenciados)
-      if (data.storage_locations?.length > 0) {
+      // Importar apenas os dados selecionados na ordem correta
+      if (selectedTables.storage_locations && data.storage_locations?.length > 0) {
         await supabase.from("storage_locations").upsert(data.storage_locations);
       }
 
-      // Importar notas fiscais
-      if (data.invoices?.length > 0) {
+      if (selectedTables.invoices && data.invoices?.length > 0) {
         await supabase.from("invoices").upsert(data.invoices);
       }
 
-      // Importar produtos
-      if (data.products?.length > 0) {
+      if (selectedTables.products && data.products?.length > 0) {
         await supabase.from("products").upsert(data.products);
       }
 
-      // Importar entradas
-      if (data.product_entries?.length > 0) {
+      if (selectedTables.product_entries && data.product_entries?.length > 0) {
         await supabase.from("product_entries").upsert(data.product_entries);
       }
 
-      // Importar saídas
-      if (data.product_exits?.length > 0) {
+      if (selectedTables.product_exits && data.product_exits?.length > 0) {
         await supabase.from("product_exits").upsert(data.product_exits);
       }
 
-      // Importar lista de compras
-      if (data.shopping_list?.length > 0) {
+      if (selectedTables.shopping_list && data.shopping_list?.length > 0) {
         await supabase.from("shopping_list").upsert(data.shopping_list);
       }
 
@@ -410,19 +433,40 @@ export default function Settings() {
       queryClient.invalidateQueries();
 
       toast({ title: "Dados importados com sucesso!" });
+      setBackupPreview(null);
+      setSelectedTables({
+        products: true,
+        storage_locations: true,
+        invoices: true,
+        product_entries: true,
+        product_exits: true,
+        shopping_list: true
+      });
     } catch (error) {
       console.error("Erro ao importar:", error);
       toast({
         title: "Erro ao importar dados",
-        description: error instanceof Error ? error.message : "Formato inválido",
+        description: error instanceof Error ? error.message : "Erro ao processar dados",
         variant: "destructive"
       });
     } finally {
       setIsImporting(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
     }
+  };
+
+  const toggleTableSelection = (table: keyof typeof selectedTables) => {
+    setSelectedTables(prev => ({ ...prev, [table]: !prev[table] }));
+  };
+
+  const toggleAllTables = (selected: boolean) => {
+    setSelectedTables({
+      products: selected,
+      storage_locations: selected,
+      invoices: selected,
+      product_entries: selected,
+      product_exits: selected,
+      shopping_list: selected
+    });
   };
 
   return (
@@ -782,29 +826,140 @@ export default function Settings() {
                   </div>
 
                   <div className="border-t pt-4">
-                    <h3 className="text-lg font-semibold mb-2">Importar Dados</h3>
+                    <h3 className="text-lg font-semibold mb-2">Importação Seletiva</h3>
                     <p className="text-sm text-muted-foreground mb-4">
-                      Carregue um arquivo de backup para restaurar ou importar dados. 
+                      Carregue um arquivo de backup e escolha quais dados deseja importar.
                       <span className="font-semibold text-destructive"> Atenção: </span>
                       Os dados existentes com os mesmos IDs serão substituídos.
                     </p>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept=".json"
-                      onChange={handleImportData}
-                      className="hidden"
-                      id="file-upload"
-                    />
-                    <Button
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={isImporting}
-                      variant="outline"
-                      className="w-full sm:w-auto"
-                    >
-                      <Upload className="mr-2 h-4 w-4" />
-                      {isImporting ? "Importando..." : "Importar Backup"}
-                    </Button>
+                    
+                    {!backupPreview ? (
+                      <>
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept=".json"
+                          onChange={handleLoadBackupFile}
+                          className="hidden"
+                          id="file-upload"
+                        />
+                        <Button
+                          onClick={() => fileInputRef.current?.click()}
+                          variant="outline"
+                          className="w-full sm:w-auto"
+                        >
+                          <Upload className="mr-2 h-4 w-4" />
+                          Carregar Arquivo de Backup
+                        </Button>
+                      </>
+                    ) : (
+                      <div className="space-y-4 border rounded-lg p-4 bg-muted/30">
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <p className="font-semibold">Backup Carregado</p>
+                            <p className="text-xs text-muted-foreground">
+                              Exportado em: {new Date(backupPreview.export_date).toLocaleString('pt-BR')}
+                            </p>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setBackupPreview(null);
+                              setSelectedTables({
+                                products: true,
+                                storage_locations: true,
+                                invoices: true,
+                                product_entries: true,
+                                product_exits: true,
+                                shopping_list: true
+                              });
+                            }}
+                          >
+                            Cancelar
+                          </Button>
+                        </div>
+
+                        <div className="border-t pt-4">
+                          <div className="flex justify-between items-center mb-3">
+                            <h4 className="font-semibold text-sm">Selecione os dados para importar:</h4>
+                            <div className="space-x-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => toggleAllTables(true)}
+                              >
+                                Todos
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => toggleAllTables(false)}
+                              >
+                                Nenhum
+                              </Button>
+                            </div>
+                          </div>
+                          
+                          <div className="space-y-3">
+                            {Object.entries({
+                              products: "Produtos",
+                              storage_locations: "Locais de Armazenamento",
+                              invoices: "Notas Fiscais",
+                              product_entries: "Entradas de Produtos",
+                              product_exits: "Saídas de Produtos",
+                              shopping_list: "Lista de Compras"
+                            }).map(([key, label]) => {
+                              const count = backupPreview.data[key]?.length || 0;
+                              return (
+                                <div
+                                  key={key}
+                                  className="flex items-center justify-between p-3 border rounded-lg bg-background hover:bg-accent/50 transition-colors cursor-pointer"
+                                  onClick={() => toggleTableSelection(key as keyof typeof selectedTables)}
+                                >
+                                  <div className="flex items-center gap-3">
+                                    <input
+                                      type="checkbox"
+                                      checked={selectedTables[key as keyof typeof selectedTables]}
+                                      onChange={() => toggleTableSelection(key as keyof typeof selectedTables)}
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="h-4 w-4 rounded border-gray-300"
+                                    />
+                                    <div>
+                                      <p className="font-medium text-sm">{label}</p>
+                                      <p className="text-xs text-muted-foreground">
+                                        {count} {count === 1 ? 'registro' : 'registros'}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  {count === 0 && (
+                                    <span className="text-xs text-muted-foreground italic">
+                                      Sem dados
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        <div className="border-t pt-4">
+                          <Button
+                            onClick={handleImportSelectedData}
+                            disabled={isImporting || !Object.values(selectedTables).some(v => v)}
+                            className="w-full"
+                          >
+                            <Upload className="mr-2 h-4 w-4" />
+                            {isImporting ? "Importando..." : "Importar Dados Selecionados"}
+                          </Button>
+                          {!Object.values(selectedTables).some(v => v) && (
+                            <p className="text-xs text-destructive text-center mt-2">
+                              Selecione pelo menos uma tabela para importar
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div className="border-t pt-4">
@@ -812,6 +967,7 @@ export default function Settings() {
                     <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
                       <li>O backup inclui: produtos, entradas, saídas, notas fiscais, locais de armazenamento e lista de compras</li>
                       <li>Dados de usuários e permissões não são incluídos por segurança</li>
+                      <li>A importação seletiva permite escolher exatamente quais dados restaurar</li>
                       <li>Ao importar, os dados com IDs existentes serão atualizados</li>
                       <li>Guarde os backups em local seguro</li>
                     </ul>
