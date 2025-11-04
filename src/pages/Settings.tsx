@@ -5,7 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, Pencil, Trash2, Download, Upload } from "lucide-react";
-import { format } from "date-fns";
+import { format, isValid, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
   Table,
@@ -887,7 +887,16 @@ export default function Settings() {
                           <div>
                             <p className="font-semibold">Backup Carregado</p>
                             <p className="text-xs text-muted-foreground">
-                              Exportado em: {format(new Date(backupPreview.export_date), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                              Exportado em: {(() => {
+                                try {
+                                  const date = parseISO(backupPreview.export_date);
+                                  return isValid(date) 
+                                    ? format(date, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })
+                                    : "Data inválida";
+                                } catch {
+                                  return "Data inválida";
+                                }
+                              })()}
                             </p>
                           </div>
                           <Button
