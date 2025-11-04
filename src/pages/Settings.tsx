@@ -5,6 +5,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, Pencil, Trash2, Download, Upload } from "lucide-react";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import {
   Table,
   TableBody,
@@ -885,7 +887,7 @@ export default function Settings() {
                           <div>
                             <p className="font-semibold">Backup Carregado</p>
                             <p className="text-xs text-muted-foreground">
-                              Exportado em: {new Date(backupPreview.export_date).toLocaleString('pt-BR')}
+                              Exportado em: {format(new Date(backupPreview.export_date), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
                             </p>
                           </div>
                           <Button
