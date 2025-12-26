@@ -7,7 +7,8 @@ import {
   ShoppingCart,
   Settings,
   LogOut,
-  BarChart3
+  BarChart3,
+  Wifi
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import {
@@ -33,6 +34,7 @@ const menuItems = [
   { title: "Notas Fiscais", url: "/invoices", icon: FileText },
   { title: "Lista de Compras", url: "/shopping", icon: ShoppingCart },
   { title: "Relatórios", url: "/reports", icon: BarChart3 },
+  { title: "Conectividade", url: "/connectivity", icon: Wifi },
   { title: "Configurações", url: "/settings", icon: Settings },
 ];
 
