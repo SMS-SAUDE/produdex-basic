@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, Pencil, Trash2, Download, Upload } from "lucide-react";
+import OrganizationSettings from "@/components/OrganizationSettings";
 import { format, isValid, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
@@ -503,12 +504,19 @@ export default function Settings() {
       <h1 className="text-3xl font-bold">Configurações</h1>
 
       <Tabs defaultValue="profile" className="w-full">
-        <TabsList>
+        <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="profile">Perfil</TabsTrigger>
+          {isAdmin && <TabsTrigger value="organization">Organização</TabsTrigger>}
           {isAdmin && <TabsTrigger value="users">Usuários</TabsTrigger>}
           {isAdmin && <TabsTrigger value="locations">Locais de Armazenamento</TabsTrigger>}
           {isAdmin && <TabsTrigger value="backup">Backup</TabsTrigger>}
         </TabsList>
+
+        {isAdmin && (
+          <TabsContent value="organization">
+            <OrganizationSettings />
+          </TabsContent>
+        )}
 
         <TabsContent value="profile">
           <Card>
