@@ -61,6 +61,48 @@ export type Database = {
           },
         ]
       }
+      organization_settings: {
+        Row: {
+          address: string | null
+          cnpj: string | null
+          company_name: string
+          coordinator_name: string | null
+          created_at: string
+          created_by: string | null
+          developer_name: string | null
+          id: string
+          logo_url: string | null
+          secretary_name: string | null
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          cnpj?: string | null
+          company_name: string
+          coordinator_name?: string | null
+          created_at?: string
+          created_by?: string | null
+          developer_name?: string | null
+          id?: string
+          logo_url?: string | null
+          secretary_name?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          cnpj?: string | null
+          company_name?: string
+          coordinator_name?: string | null
+          created_at?: string
+          created_by?: string | null
+          developer_name?: string | null
+          id?: string
+          logo_url?: string | null
+          secretary_name?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       product_entries: {
         Row: {
           created_at: string | null
