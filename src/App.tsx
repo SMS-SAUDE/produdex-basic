@@ -14,6 +14,7 @@ import Invoices from "./pages/Invoices";
 import Shopping from "./pages/Shopping";
 import Settings from "./pages/Settings";
 import Reports from "./pages/Reports";
+import Connectivity from "./pages/Connectivity";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -102,6 +103,16 @@ const App = () => (
               <ProtectedRoute>
                 <Layout>
                   <Reports />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/connectivity"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <Connectivity />
                 </Layout>
               </ProtectedRoute>
             }
