@@ -4,8 +4,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Pencil, Trash2, Download, Upload } from "lucide-react";
+import { Plus, Pencil, Trash2, Download, Upload, FileSpreadsheet } from "lucide-react";
 import OrganizationSettings from "@/components/OrganizationSettings";
+import DataImportExport from "@/components/DataImportExport";
 import { format, isValid, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
@@ -509,6 +510,7 @@ export default function Settings() {
           {isAdmin && <TabsTrigger value="organization">Organização</TabsTrigger>}
           {isAdmin && <TabsTrigger value="users">Usuários</TabsTrigger>}
           {isAdmin && <TabsTrigger value="locations">Locais de Armazenamento</TabsTrigger>}
+          {isAdmin && <TabsTrigger value="import-export">Importação/Exportação</TabsTrigger>}
           {isAdmin && <TabsTrigger value="backup">Backup</TabsTrigger>}
         </TabsList>
 
@@ -833,6 +835,12 @@ export default function Settings() {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+        )}
+
+        {isAdmin && (
+          <TabsContent value="import-export">
+            <DataImportExport />
           </TabsContent>
         )}
 
